@@ -63,8 +63,8 @@ interface NamespaceExtractor {
 export function withNamespaces(
   namespace?: Namespace | NamespaceExtractor,
   options?: WithNamespacesOptions,
-): <P extends WithNamespaces>(
-  component: React.ComponentType<P>,
+): <P extends object>(
+  component: React.ComponentType<P & WithNamespaces>,
 ) => React.ComponentType<Subtract<P, WithNamespaces>>;
 
 export const translate: typeof withNamespaces;
