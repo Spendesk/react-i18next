@@ -1,6 +1,6 @@
 {
   "name": "@dev-spendesk/react-i18next",
-  "version": "9.0.10-custom-1",
+  "version": "9.0.10-custom-2",
   "description": "Internationalization for react done right. Using the i18next i18n ecosystem.",
   "main": "dist/commonjs/index.js",
   "types": "src/index.d.ts",

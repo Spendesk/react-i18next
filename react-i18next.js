@@ -6,6 +6,171 @@
 
   var React__default = 'default' in React ? React['default'] : React;
 
+  function warn() {
+    if (console && console.warn) {
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+
+      if (typeof args[0] === 'string') args[0] = "react-i18next:: ".concat(args[0]);
+      console.warn.apply(null, args);
+    }
+  }
+  var alreadyWarned = {};
+  function warnOnce() {
+    for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+      args[_key2] = arguments[_key2];
+    }
+
+    if (typeof args[0] === 'string' && alreadyWarned[args[0]]) return;
+    if (typeof args[0] === 'string') alreadyWarned[args[0]] = new Date();
+    warn(...args);
+  }
+  function deprecated() {
+    if (process && process.env && ("development" === 'development')) {
+      for (var _len3 = arguments.length, args = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+        args[_key3] = arguments[_key3];
+      }
+
+      if (typeof args[0] === 'string') args[0] = "deprecation warning -> ".concat(args[0]);
+      warnOnce(...args);
+    }
+  }
+  var initializedLanguageOnce = false;
+  var initializedStoreOnce = false;
+  function initSSR(props, setIsInitialSSR) {
+    // nextjs / SSR: getting data from next.js or other ssr stack
+    if (!initializedStoreOnce && props.initialI18nStore) {
+      props.i18n.services.resourceStore.data = props.initialI18nStore;
+      if (setIsInitialSSR) props.i18n.options.isInitialSSR = true;
+      if (props.i18nOptions) props.i18nOptions.wait = false; // we got all passed down already
+
+      initializedStoreOnce = true;
+    }
+
+    if (!initializedLanguageOnce && props.initialLanguage) {
+      props.i18n.changeLanguage(props.initialLanguage);
+      initializedLanguageOnce = true;
+    }
+  } // --------------
+  // loadNamespaces
+
+  var objectEntries = Object.entries || function (obj) {
+    var ownProps = Object.keys(obj);
+    var i = ownProps.length;
+    var resArray = new Array(i); // preallocate the Array
+
+    while (i--) {
+      resArray[i] = [ownProps[i], obj[ownProps[i]]];
+    }
+
+    return resArray;
+  }; // Borrowed from https://github.com/Rezonans/redux-async-connect/blob/master/modules/ReduxAsyncConnect.js#L16
+
+
+  function eachComponents(components, iterator) {
+    for (var i = 0, l = components.length; i < l; i++) {
+      // eslint-disable-line id-length
+      if (typeof components[i] === 'object') {
+        for (var [key, value] of objectEntries(components[i])) {
+          iterator(value, i, key);
+        }
+      } else {
+        iterator(components[i], i);
+      }
+    }
+  }
+
+  function filterAndFlattenComponents(components) {
+    var flattened = [];
+    eachComponents(components, Component => {
+      if (Component && Component.namespaces) {
+        Component.namespaces.forEach(namespace => {
+          if (flattened.indexOf(namespace) === -1) {
+            flattened.push(namespace);
+          }
+        });
+      }
+    });
+    return flattened;
+  }
+
+  function loadNamespaces(_ref) {
+    var {
+      components,
+      i18n
+    } = _ref;
+    var allNamespaces = filterAndFlattenComponents(components);
+    return new Promise(resolve => {
+      i18n.loadNamespaces(allNamespaces, resolve);
+    });
+  } // -------------
+  // shallowEqual
+
+  /**
+   * Copyright (c) 2013-present, Facebook, Inc.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   *
+   * @providesModule shallowEqual
+   * @typechecks
+   * @flow
+   */
+
+  /* eslint-disable no-self-compare */
+
+  var hasOwnProperty = Object.prototype.hasOwnProperty;
+  /**
+   * inlined Object.is polyfill to avoid requiring consumers ship their own
+   * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
+   */
+
+  function is(x, y) {
+    // SameValue algorithm
+    if (x === y) {
+      // Steps 1-5, 7-10
+      // Steps 6.b-6.e: +0 != -0
+      // Added the nonzero y check to make Flow happy, but it is redundant
+      return x !== 0 || y !== 0 || 1 / x === 1 / y;
+    } // Step 6.a: NaN == NaN
+
+
+    return x !== x && y !== y;
+  }
+  /**
+   * Performs equality by iterating through keys on an object and returning false
+   * when any key has values which are not strictly equal between the arguments.
+   * Returns true when the values of all keys are strictly equal.
+   */
+
+
+  function shallowEqual(objA, objB) {
+    if (is(objA, objB)) {
+      return true;
+    }
+
+    if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
+      return false;
+    }
+
+    var keysA = Object.keys(objA);
+    var keysB = Object.keys(objB);
+
+    if (keysA.length !== keysB.length) {
+      return false;
+    } // Test for A's keys different from B.
+
+
+    for (var i = 0; i < keysA.length; i++) {
+      if (!hasOwnProperty.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   function _defineProperty(obj, key, value) {
     if (key in obj) {
       Object.defineProperty(obj, key, {
@@ -21,20 +186,35 @@
     return obj;
   }
 
-  function _objectSpread(target) {
+  function ownKeys(object, enumerableOnly) {
+    var keys = Object.keys(object);
+
+    if (Object.getOwnPropertySymbols) {
+      var symbols = Object.getOwnPropertySymbols(object);
+      if (enumerableOnly) symbols = symbols.filter(function (sym) {
+        return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+      });
+      keys.push.apply(keys, symbols);
+    }
+
+    return keys;
+  }
+
+  function _objectSpread2(target) {
     for (var i = 1; i < arguments.length; i++) {
       var source = arguments[i] != null ? arguments[i] : {};
-      var ownKeys = Object.keys(source);
 
-      if (typeof Object.getOwnPropertySymbols === 'function') {
-        ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) {
-          return Object.getOwnPropertyDescriptor(source, sym).enumerable;
-        }));
+      if (i % 2) {
+        ownKeys(Object(source), true).forEach(function (key) {
+          _defineProperty(target, key, source[key]);
+        });
+      } else if (Object.getOwnPropertyDescriptors) {
+        Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+      } else {
+        ownKeys(Object(source)).forEach(function (key) {
+          Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+        });
       }
-
-      ownKeys.forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
     }
 
     return target;
@@ -76,213 +256,6 @@
     return target;
   }
 
-  function _slicedToArray(arr, i) {
-    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
-  }
-
-  function _arrayWithHoles(arr) {
-    if (Array.isArray(arr)) return arr;
-  }
-
-  function _iterableToArrayLimit(arr, i) {
-    var _arr = [];
-    var _n = true;
-    var _d = false;
-    var _e = undefined;
-
-    try {
-      for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
-        _arr.push(_s.value);
-
-        if (i && _arr.length === i) break;
-      }
-    } catch (err) {
-      _d = true;
-      _e = err;
-    } finally {
-      try {
-        if (!_n && _i["return"] != null) _i["return"]();
-      } finally {
-        if (_d) throw _e;
-      }
-    }
-
-    return _arr;
-  }
-
-  function _nonIterableRest() {
-    throw new TypeError("Invalid attempt to destructure non-iterable instance");
-  }
-
-  function warn() {
-    if (console && console.warn) {
-      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-        args[_key] = arguments[_key];
-      }
-
-      if (typeof args[0] === 'string') args[0] = `react-i18next:: ${args[0]}`;
-      console.warn.apply(null, args);
-    }
-  }
-  const alreadyWarned = {};
-  function warnOnce() {
-    for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-      args[_key2] = arguments[_key2];
-    }
-
-    if (typeof args[0] === 'string' && alreadyWarned[args[0]]) return;
-    if (typeof args[0] === 'string') alreadyWarned[args[0]] = new Date();
-    warn(...args);
-  }
-  function deprecated() {
-    if (process && process.env && ("development" === 'development')) {
-      for (var _len3 = arguments.length, args = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
-        args[_key3] = arguments[_key3];
-      }
-
-      if (typeof args[0] === 'string') args[0] = `deprecation warning -> ${args[0]}`;
-      warnOnce(...args);
-    }
-  }
-  let initializedLanguageOnce = false;
-  let initializedStoreOnce = false;
-  function initSSR(props, setIsInitialSSR) {
-    // nextjs / SSR: getting data from next.js or other ssr stack
-    if (!initializedStoreOnce && props.initialI18nStore) {
-      props.i18n.services.resourceStore.data = props.initialI18nStore;
-      if (setIsInitialSSR) props.i18n.options.isInitialSSR = true;
-      if (props.i18nOptions) props.i18nOptions.wait = false; // we got all passed down already
-
-      initializedStoreOnce = true;
-    }
-
-    if (!initializedLanguageOnce && props.initialLanguage) {
-      props.i18n.changeLanguage(props.initialLanguage);
-      initializedLanguageOnce = true;
-    }
-  } // --------------
-  // loadNamespaces
-
-  const objectEntries = Object.entries || function (obj) {
-    const ownProps = Object.keys(obj);
-    let i = ownProps.length;
-    const resArray = new Array(i); // preallocate the Array
-
-    while (i--) resArray[i] = [ownProps[i], obj[ownProps[i]]];
-
-    return resArray;
-  }; // Borrowed from https://github.com/Rezonans/redux-async-connect/blob/master/modules/ReduxAsyncConnect.js#L16
-
-
-  function eachComponents(components, iterator) {
-    for (let i = 0, l = components.length; i < l; i++) {
-      // eslint-disable-line id-length
-      if (typeof components[i] === 'object') {
-        for (const _ref of objectEntries(components[i])) {
-          var _ref2 = _slicedToArray(_ref, 2);
-
-          const key = _ref2[0];
-          const value = _ref2[1];
-          iterator(value, i, key);
-        }
-      } else {
-        iterator(components[i], i);
-      }
-    }
-  }
-
-  function filterAndFlattenComponents(components) {
-    const flattened = [];
-    eachComponents(components, Component => {
-      if (Component && Component.namespaces) {
-        Component.namespaces.forEach(namespace => {
-          if (flattened.indexOf(namespace) === -1) {
-            flattened.push(namespace);
-          }
-        });
-      }
-    });
-    return flattened;
-  }
-
-  function loadNamespaces(_ref3) {
-    let components = _ref3.components,
-        i18n = _ref3.i18n;
-    const allNamespaces = filterAndFlattenComponents(components);
-    return new Promise(resolve => {
-      i18n.loadNamespaces(allNamespaces, resolve);
-    });
-  } // -------------
-  // shallowEqual
-
-  /**
-   * Copyright (c) 2013-present, Facebook, Inc.
-   *
-   * This source code is licensed under the MIT license found in the
-   * LICENSE file in the root directory of this source tree.
-   *
-   * @providesModule shallowEqual
-   * @typechecks
-   * @flow
-   */
-
-  /* eslint-disable no-self-compare */
-
-  const hasOwnProperty = Object.prototype.hasOwnProperty;
-  /**
-   * inlined Object.is polyfill to avoid requiring consumers ship their own
-   * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
-   */
-
-  function is(x, y) {
-    // SameValue algorithm
-    if (x === y) {
-      // Steps 1-5, 7-10
-      // Steps 6.b-6.e: +0 != -0
-      // Added the nonzero y check to make Flow happy, but it is redundant
-      return x !== 0 || y !== 0 || 1 / x === 1 / y;
-    } // Step 6.a: NaN == NaN
-
-
-    return x !== x && y !== y;
-  }
-  /**
-   * Performs equality by iterating through keys on an object and returning false
-   * when any key has values which are not strictly equal between the arguments.
-   * Returns true when the values of all keys are strictly equal.
-   */
-
-
-  function shallowEqual(objA, objB) {
-    if (is(objA, objB)) {
-      return true;
-    }
-
-    if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
-      return false;
-    }
-
-    const keysA = Object.keys(objA);
-    const keysB = Object.keys(objB);
-
-    if (keysA.length !== keysB.length) {
-      return false;
-    } // Test for A's keys different from B.
-
-
-    for (let i = 0; i < keysA.length; i++) {
-      if (!hasOwnProperty.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  function unwrapExports (x) {
-  	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x.default : x;
-  }
-
   function createCommonjsModule(fn, module) {
   	return module = { exports: {} }, fn(module, module.exports), module.exports;
   }
@@ -291,10 +264,6 @@
 
   {
     (function () {
-
-      Object.defineProperty(exports, '__esModule', {
-        value: true
-      }); // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
       // nor polyfill, then a plain number is used for performance.
 
       var hasSymbol = typeof Symbol === 'function' && Symbol.for;
@@ -304,73 +273,25 @@
       var REACT_STRICT_MODE_TYPE = hasSymbol ? Symbol.for('react.strict_mode') : 0xeacc;
       var REACT_PROFILER_TYPE = hasSymbol ? Symbol.for('react.profiler') : 0xead2;
       var REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for('react.provider') : 0xeacd;
-      var REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for('react.context') : 0xeace;
+      var REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for('react.context') : 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
+      // (unstable) APIs that have been removed. Can we remove the symbols?
+
       var REACT_ASYNC_MODE_TYPE = hasSymbol ? Symbol.for('react.async_mode') : 0xeacf;
       var REACT_CONCURRENT_MODE_TYPE = hasSymbol ? Symbol.for('react.concurrent_mode') : 0xeacf;
       var REACT_FORWARD_REF_TYPE = hasSymbol ? Symbol.for('react.forward_ref') : 0xead0;
       var REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for('react.suspense') : 0xead1;
+      var REACT_SUSPENSE_LIST_TYPE = hasSymbol ? Symbol.for('react.suspense_list') : 0xead8;
       var REACT_MEMO_TYPE = hasSymbol ? Symbol.for('react.memo') : 0xead3;
       var REACT_LAZY_TYPE = hasSymbol ? Symbol.for('react.lazy') : 0xead4;
+      var REACT_BLOCK_TYPE = hasSymbol ? Symbol.for('react.block') : 0xead9;
+      var REACT_FUNDAMENTAL_TYPE = hasSymbol ? Symbol.for('react.fundamental') : 0xead5;
+      var REACT_RESPONDER_TYPE = hasSymbol ? Symbol.for('react.responder') : 0xead6;
+      var REACT_SCOPE_TYPE = hasSymbol ? Symbol.for('react.scope') : 0xead7;
 
       function isValidElementType(type) {
         return typeof type === 'string' || typeof type === 'function' || // Note: its typeof might be other than 'symbol' or 'number' if it's a polyfill.
-        type === REACT_FRAGMENT_TYPE || type === REACT_CONCURRENT_MODE_TYPE || type === REACT_PROFILER_TYPE || type === REACT_STRICT_MODE_TYPE || type === REACT_SUSPENSE_TYPE || typeof type === 'object' && type !== null && (type.$$typeof === REACT_LAZY_TYPE || type.$$typeof === REACT_MEMO_TYPE || type.$$typeof === REACT_PROVIDER_TYPE || type.$$typeof === REACT_CONTEXT_TYPE || type.$$typeof === REACT_FORWARD_REF_TYPE);
+        type === REACT_FRAGMENT_TYPE || type === REACT_CONCURRENT_MODE_TYPE || type === REACT_PROFILER_TYPE || type === REACT_STRICT_MODE_TYPE || type === REACT_SUSPENSE_TYPE || type === REACT_SUSPENSE_LIST_TYPE || typeof type === 'object' && type !== null && (type.$$typeof === REACT_LAZY_TYPE || type.$$typeof === REACT_MEMO_TYPE || type.$$typeof === REACT_PROVIDER_TYPE || type.$$typeof === REACT_CONTEXT_TYPE || type.$$typeof === REACT_FORWARD_REF_TYPE || type.$$typeof === REACT_FUNDAMENTAL_TYPE || type.$$typeof === REACT_RESPONDER_TYPE || type.$$typeof === REACT_SCOPE_TYPE || type.$$typeof === REACT_BLOCK_TYPE);
       }
-      /**
-       * Forked from fbjs/warning:
-       * https://github.com/facebook/fbjs/blob/e66ba20ad5be433eb54423f2b097d829324d9de6/packages/fbjs/src/__forks__/warning.js
-       *
-       * Only change is we use console.warn instead of console.error,
-       * and do nothing when 'console' is not supported.
-       * This really simplifies the code.
-       * ---
-       * Similar to invariant but only logs a warning if the condition is not met.
-       * This can be used to log issues in development environments in critical
-       * paths. Removing the logging code for production environments will keep the
-       * same logic and follow the same code paths.
-       */
-
-
-      var lowPriorityWarning = function lowPriorityWarning() {};
-
-      {
-        var printWarning = function printWarning(format) {
-          for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-            args[_key - 1] = arguments[_key];
-          }
-
-          var argIndex = 0;
-          var message = 'Warning: ' + format.replace(/%s/g, function () {
-            return args[argIndex++];
-          });
-
-          if (typeof console !== 'undefined') {
-            console.warn(message);
-          }
-
-          try {
-            // --- Welcome to debugging React ---
-            // This error was thrown as a convenience so that you can use this stack
-            // to find the callsite that caused this warning to fire.
-            throw new Error(message);
-          } catch (x) {}
-        };
-
-        lowPriorityWarning = function lowPriorityWarning(condition, format) {
-          if (format === undefined) {
-            throw new Error('`lowPriorityWarning(condition, format, ...args)` requires a warning ' + 'message argument');
-          }
-
-          if (!condition) {
-            for (var _len2 = arguments.length, args = Array(_len2 > 2 ? _len2 - 2 : 0), _key2 = 2; _key2 < _len2; _key2++) {
-              args[_key2 - 2] = arguments[_key2];
-            }
-
-            printWarning.apply(undefined, [format].concat(args));
-          }
-        };
-      }
-      var lowPriorityWarning$1 = lowPriorityWarning;
 
       function typeOf(object) {
         if (typeof object === 'object' && object !== null) {
@@ -395,6 +316,8 @@
                   switch ($$typeofType) {
                     case REACT_CONTEXT_TYPE:
                     case REACT_FORWARD_REF_TYPE:
+                    case REACT_LAZY_TYPE:
+                    case REACT_MEMO_TYPE:
                     case REACT_PROVIDER_TYPE:
                       return $$typeofType;
 
@@ -404,8 +327,6 @@
 
               }
 
-            case REACT_LAZY_TYPE:
-            case REACT_MEMO_TYPE:
             case REACT_PORTAL_TYPE:
               return $$typeof;
           }
@@ -433,8 +354,9 @@
       function isAsyncMode(object) {
         {
           if (!hasWarnedAboutDeprecatedIsAsyncMode) {
-            hasWarnedAboutDeprecatedIsAsyncMode = true;
-            lowPriorityWarning$1(false, 'The ReactIs.isAsyncMode() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactIs.isConcurrentMode() instead. It has the exact same API.');
+            hasWarnedAboutDeprecatedIsAsyncMode = true; // Using console['warn'] to evade Babel and ESLint
+
+            console['warn']('The ReactIs.isAsyncMode() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactIs.isConcurrentMode() instead. It has the exact same API.');
           }
         }
         return isConcurrentMode(object) || typeOf(object) === REACT_ASYNC_MODE_TYPE;
@@ -488,7 +410,6 @@
         return typeOf(object) === REACT_SUSPENSE_TYPE;
       }
 
-      exports.typeOf = typeOf;
       exports.AsyncMode = AsyncMode;
       exports.ConcurrentMode = ConcurrentMode;
       exports.ContextConsumer = ContextConsumer;
@@ -502,7 +423,6 @@
       exports.Profiler = Profiler;
       exports.StrictMode = StrictMode;
       exports.Suspense = Suspense;
-      exports.isValidElementType = isValidElementType;
       exports.isAsyncMode = isAsyncMode;
       exports.isConcurrentMode = isConcurrentMode;
       exports.isContextConsumer = isContextConsumer;
@@ -516,39 +436,39 @@
       exports.isProfiler = isProfiler;
       exports.isStrictMode = isStrictMode;
       exports.isSuspense = isSuspense;
+      exports.isValidElementType = isValidElementType;
+      exports.typeOf = typeOf;
     })();
   }
   });
-
-  unwrapExports(reactIs_development);
-  var reactIs_development_1 = reactIs_development.typeOf;
-  var reactIs_development_2 = reactIs_development.AsyncMode;
-  var reactIs_development_3 = reactIs_development.ConcurrentMode;
-  var reactIs_development_4 = reactIs_development.ContextConsumer;
-  var reactIs_development_5 = reactIs_development.ContextProvider;
-  var reactIs_development_6 = reactIs_development.Element;
-  var reactIs_development_7 = reactIs_development.ForwardRef;
-  var reactIs_development_8 = reactIs_development.Fragment;
-  var reactIs_development_9 = reactIs_development.Lazy;
-  var reactIs_development_10 = reactIs_development.Memo;
-  var reactIs_development_11 = reactIs_development.Portal;
-  var reactIs_development_12 = reactIs_development.Profiler;
-  var reactIs_development_13 = reactIs_development.StrictMode;
-  var reactIs_development_14 = reactIs_development.Suspense;
-  var reactIs_development_15 = reactIs_development.isValidElementType;
-  var reactIs_development_16 = reactIs_development.isAsyncMode;
-  var reactIs_development_17 = reactIs_development.isConcurrentMode;
-  var reactIs_development_18 = reactIs_development.isContextConsumer;
-  var reactIs_development_19 = reactIs_development.isContextProvider;
-  var reactIs_development_20 = reactIs_development.isElement;
-  var reactIs_development_21 = reactIs_development.isForwardRef;
-  var reactIs_development_22 = reactIs_development.isFragment;
-  var reactIs_development_23 = reactIs_development.isLazy;
-  var reactIs_development_24 = reactIs_development.isMemo;
-  var reactIs_development_25 = reactIs_development.isPortal;
-  var reactIs_development_26 = reactIs_development.isProfiler;
-  var reactIs_development_27 = reactIs_development.isStrictMode;
-  var reactIs_development_28 = reactIs_development.isSuspense;
+  var reactIs_development_1 = reactIs_development.AsyncMode;
+  var reactIs_development_2 = reactIs_development.ConcurrentMode;
+  var reactIs_development_3 = reactIs_development.ContextConsumer;
+  var reactIs_development_4 = reactIs_development.ContextProvider;
+  var reactIs_development_5 = reactIs_development.Element;
+  var reactIs_development_6 = reactIs_development.ForwardRef;
+  var reactIs_development_7 = reactIs_development.Fragment;
+  var reactIs_development_8 = reactIs_development.Lazy;
+  var reactIs_development_9 = reactIs_development.Memo;
+  var reactIs_development_10 = reactIs_development.Portal;
+  var reactIs_development_11 = reactIs_development.Profiler;
+  var reactIs_development_12 = reactIs_development.StrictMode;
+  var reactIs_development_13 = reactIs_development.Suspense;
+  var reactIs_development_14 = reactIs_development.isAsyncMode;
+  var reactIs_development_15 = reactIs_development.isConcurrentMode;
+  var reactIs_development_16 = reactIs_development.isContextConsumer;
+  var reactIs_development_17 = reactIs_development.isContextProvider;
+  var reactIs_development_18 = reactIs_development.isElement;
+  var reactIs_development_19 = reactIs_development.isForwardRef;
+  var reactIs_development_20 = reactIs_development.isFragment;
+  var reactIs_development_21 = reactIs_development.isLazy;
+  var reactIs_development_22 = reactIs_development.isMemo;
+  var reactIs_development_23 = reactIs_development.isPortal;
+  var reactIs_development_24 = reactIs_development.isProfiler;
+  var reactIs_development_25 = reactIs_development.isStrictMode;
+  var reactIs_development_26 = reactIs_development.isSuspense;
+  var reactIs_development_27 = reactIs_development.isValidElementType;
+  var reactIs_development_28 = reactIs_development.typeOf;
 
   var reactIs = createCommonjsModule(function (module) {
 
@@ -643,7 +563,7 @@
 
   var hoistNonReactStatics_cjs = hoistNonReactStatics;
 
-  let defaultOptions = {
+  var defaultOptions = {
     wait: false,
     withRef: false,
     bindI18n: 'languageChanged loaded',
@@ -654,10 +574,10 @@
     omitBoundRerender: true,
     transEmptyNodeValue: ''
   };
-  let i18nInstance;
+  var i18nInstance;
   function setDefaults() {
-    let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    defaultOptions = _objectSpread({}, defaultOptions, options);
+    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    defaultOptions = _objectSpread2(_objectSpread2({}, defaultOptions), options);
   }
   function getDefaults() {
     return defaultOptions;
@@ -668,7 +588,7 @@
   function getI18n() {
     return i18nInstance;
   }
-  const reactI18nextModule = {
+  var reactI18nextModule = {
     type: '3rdParty',
 
     init(instance) {
@@ -677,18 +597,20 @@
     }
 
   };
-  const I18nContext = React__default.createContext(); // hoc for context
+  var I18nContext = React__default.createContext(); // hoc for context
 
   function withContext() {
     return function Wrapper(WrappedComponent) {
       class WithContext extends React.Component {
         render() {
-          const _this$props = this.props,
-                innerRef = _this$props.innerRef,
-                rest = _objectWithoutProperties(_this$props, ["innerRef"]);
+          var _this$props = this.props,
+              {
+            innerRef
+          } = _this$props,
+              rest = _objectWithoutProperties(_this$props, ["innerRef"]);
 
           if (innerRef) rest.ref = innerRef;
-          return React__default.createElement(I18nContext.Consumer, null, ctx => React__default.createElement(WrappedComponent, _objectSpread({}, ctx, rest)));
+          return /*#__PURE__*/React__default.createElement(I18nContext.Consumer, null, ctx => /*#__PURE__*/React__default.createElement(WrappedComponent, _objectSpread2(_objectSpread2({}, ctx), rest)));
         }
 
       }
@@ -707,24 +629,26 @@
     return function Wrapper(WrappedComponent) {
       class WithMergedOptions extends React.Component {
         render() {
-          const _this$props2 = this.props,
-                innerRef = _this$props2.innerRef,
-                rest = _objectWithoutProperties(_this$props2, ["innerRef"]);
+          var _this$props2 = this.props,
+              {
+            innerRef
+          } = _this$props2,
+              rest = _objectWithoutProperties(_this$props2, ["innerRef"]);
 
           if (innerRef) rest.ref = innerRef; // merged extra props
 
-          const extraProps = {};
-          let i18nOptions = this.props.i18nOptions || this.i18nOptions; // as default we add i18n, basic t function and i18nOptions from setI18n
+          var extraProps = {};
+          var i18nOptions = this.props.i18nOptions || this.i18nOptions; // as default we add i18n, basic t function and i18nOptions from setI18n
           // those get overridden by values passed by I18nContext.Provider <- eg. set in I18nextProvider
 
-          const i18n = this.props.i18n || getI18n();
+          var i18n = this.props.i18n || getI18n();
 
           if (!i18nOptions) {
-            const possibleI18nOptionsFromProps = Object.keys(defaultOptions).reduce((mem, k) => {
+            var possibleI18nOptionsFromProps = Object.keys(defaultOptions).reduce((mem, k) => {
               if (this.props[k]) mem[k] = this.props[k];
               return mem;
             }, {});
-            i18nOptions = _objectSpread({}, getDefaults(), i18n && i18n.options && i18n.options.react, possibleI18nOptionsFromProps);
+            i18nOptions = _objectSpread2(_objectSpread2(_objectSpread2({}, getDefaults()), i18n && i18n.options && i18n.options.react), possibleI18nOptionsFromProps);
             this.i18nOptions = i18nOptions;
           }
 
@@ -735,19 +659,19 @@
             extraProps.i18nOptions = i18nOptions;
           }
 
-          return React__default.createElement(WrappedComponent, _objectSpread({}, extraProps, rest));
+          return /*#__PURE__*/React__default.createElement(WrappedComponent, _objectSpread2(_objectSpread2({}, extraProps), rest));
         }
 
       }
 
-      const WithMergedOptionsWithContext = withContext()(WithMergedOptions);
+      var WithMergedOptionsWithContext = withContext()(WithMergedOptions);
       WithMergedOptionsWithContext.WrappedComponent = WrappedComponent;
-      WithMergedOptionsWithContext.displayName = `WithMergedOptions(${getDisplayName(WrappedComponent)})`;
+      WithMergedOptionsWithContext.displayName = "WithMergedOptions(".concat(getDisplayName(WrappedComponent), ")");
       return hoistNonReactStatics_cjs(WithMergedOptionsWithContext, WrappedComponent);
     };
   }
 
-  let removedIsInitialSSR = false;
+  var removedIsInitialSSR = false;
   class NamespacesConsumerComponent extends React.Component {
     constructor(props) {
       super(props);
@@ -776,15 +700,15 @@
       } // reportNS if needed for SSR
 
 
-      const namespaces = this.getNamespaces();
+      var namespaces = this.getNamespaces();
 
       if (props.reportNS) {
         namespaces.forEach(props.reportNS);
       } // check if we could flag this ready already as all is loaded
 
 
-      const language = props.i18n.languages && props.i18n.languages[0];
-      const ready = !!language && namespaces.every(ns => props.i18n.hasResourceBundle(language, ns));
+      var language = props.i18n.languages && props.i18n.languages[0];
+      var ready = !!language && namespaces.every(ns => props.i18n.hasResourceBundle(language, ns));
       this.state = {
         i18nLoadedAt: null,
         ready
@@ -805,27 +729,33 @@
     }
 
     componentWillUnmount() {
-      const _this$props = this.props,
-            i18n = _this$props.i18n,
-            i18nOptions = _this$props.i18nOptions;
+      var {
+        i18n,
+        i18nOptions
+      } = this.props;
       this.mounted = false;
 
       if (this.onI18nChanged) {
         if (i18nOptions.bindI18n) {
-          const p = i18nOptions.bindI18n.split(' ');
+          var p = i18nOptions.bindI18n.split(' ');
           p.forEach(f => i18n.off(f, this.onI18nChanged));
         }
 
         if (i18nOptions.bindStore) {
-          const p = i18nOptions.bindStore.split(' ');
-          p.forEach(f => i18n.store && i18n.store.off(f, this.onI18nChanged));
+          var _p = i18nOptions.bindStore.split(' ');
+
+          _p.forEach(f => i18n.store && i18n.store.off(f, this.onI18nChanged));
         }
       }
     }
 
     onI18nChanged() {
-      const i18nOptions = this.props.i18nOptions;
-      const ready = this.state.ready;
+      var {
+        i18nOptions
+      } = this.props;
+      var {
+        ready
+      } = this.state;
       if (!this.mounted) return;
       if (!ready && i18nOptions.omitBoundRerender) return;
       this.t = this.getI18nTranslate();
@@ -835,36 +765,41 @@
     }
 
     getI18nTranslate() {
-      const _this$props2 = this.props,
-            i18n = _this$props2.i18n,
-            i18nOptions = _this$props2.i18nOptions;
-      const namespaces = this.getNamespaces();
+      var {
+        i18n,
+        i18nOptions
+      } = this.props;
+      var namespaces = this.getNamespaces();
       return i18n.getFixedT(null, i18nOptions.nsMode === 'fallback' ? namespaces : namespaces && namespaces.length ? namespaces[0] : 'translation');
     }
 
     getNamespaces() {
-      const _this$props3 = this.props,
-            i18n = _this$props3.i18n,
-            ns = _this$props3.ns,
-            defaultNS = _this$props3.defaultNS;
-      const namespaces = typeof ns === 'function' ? ns(this.props) : ns || defaultNS || i18n.options && i18n.options.defaultNS;
+      var {
+        i18n,
+        ns,
+        defaultNS
+      } = this.props;
+      var namespaces = typeof ns === 'function' ? ns(this.props) : ns || defaultNS || i18n.options && i18n.options.defaultNS;
       return typeof namespaces === 'string' ? [namespaces] : namespaces || [];
     }
 
     loadNamespaces() {
-      const _this$props4 = this.props,
-            i18n = _this$props4.i18n,
-            i18nOptions = _this$props4.i18nOptions;
-      const ready = this.state.ready;
+      var {
+        i18n,
+        i18nOptions
+      } = this.props;
+      var {
+        ready
+      } = this.state;
 
-      const bind = () => {
+      var bind = () => {
         if (i18nOptions.bindI18n && i18n) i18n.on(i18nOptions.bindI18n, this.onI18nChanged);
         if (i18nOptions.bindStore && i18n.store) i18n.store.on(i18nOptions.bindStore, this.onI18nChanged);
       };
 
       this.mounted = true;
       i18n.loadNamespaces(this.getNamespaces(), () => {
-        const handleReady = () => {
+        var handleReady = () => {
           if (this.mounted && !ready) {
             this.setState({
               ready: true
@@ -879,7 +814,7 @@
         if (i18n.isInitialized) {
           handleReady();
         } else {
-          const initialized = () => {
+          var initialized = () => {
             // due to emitter removing issue in i18next we need to delay remove
             setTimeout(() => {
               i18n.off('initialized', initialized);
@@ -894,20 +829,22 @@
     }
 
     render() {
-      const _this$props5 = this.props,
-            children = _this$props5.children,
-            i18n = _this$props5.i18n,
-            defaultNS = _this$props5.defaultNS,
-            reportNS = _this$props5.reportNS,
-            i18nOptions = _this$props5.i18nOptions;
-
-      const _ref = this.state || {
+      var {
+        children,
+        i18n,
+        defaultNS,
+        reportNS,
+        i18nOptions
+      } = this.props;
+      var {
+        ready
+      } = this.state || {
         ready: false
-      },
-            ready = _ref.ready; // fallback if state is null...unknown edge case https://github.com/i18next/react-i18next/issues/615
+      }; // fallback if state is null...unknown edge case https://github.com/i18next/react-i18next/issues/615
 
-
-      const t = this.t;
+      var {
+        t
+      } = this;
       if (!ready && i18nOptions.wait) return null; // remove ssr flag set by provider - first render was done from now on wait if set to wait
 
       if (i18n.options && i18n.options.isInitialSSR && !removedIsInitialSSR) {
@@ -917,7 +854,7 @@
         }, 100);
       }
 
-      return React__default.createElement(I18nContext.Provider, {
+      return /*#__PURE__*/React__default.createElement(I18nContext.Provider, {
         value: {
           i18n,
           t,
@@ -934,19 +871,21 @@
     }
 
   }
-  const NamespacesConsumer = withI18n()(NamespacesConsumerComponent);
-  const I18n = NamespacesConsumer;
+  var NamespacesConsumer = withI18n()(NamespacesConsumerComponent);
+  var I18n = NamespacesConsumer;
 
   function getDisplayName$1(component) {
     return component.displayName || component.name || 'Component';
   }
 
   function withNamespaces(namespaceArg) {
-    let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
     return function Wrapper(WrappedComponent) {
       class LoadNamespace extends React.Component {
         shouldComponentUpdate(nextProps) {
-          const i18nOptions = this.props.i18nOptions;
+          var {
+            i18nOptions
+          } = this.props;
 
           if (!i18nOptions.usePureComponent && !options.usePureComponent) {
             return true;
@@ -956,44 +895,47 @@
         }
 
         render() {
-          const _this$props = this.props,
-                namespaces = _this$props.namespaces,
-                i18nOptions = _this$props.i18nOptions;
+          var {
+            namespaces,
+            i18nOptions
+          } = this.props;
 
-          const mergedI18nOptions = _objectSpread({}, i18nOptions, options);
+          var mergedI18nOptions = _objectSpread2(_objectSpread2({}, i18nOptions), options);
 
-          const extraProps = {};
+          var extraProps = {};
 
           if (mergedI18nOptions.innerRef) {
             extraProps.ref = mergedI18nOptions.innerRef;
           }
 
-          return React__default.createElement(NamespacesConsumer, _objectSpread({
+          return /*#__PURE__*/React__default.createElement(NamespacesConsumer, _objectSpread2(_objectSpread2({
             ns: namespaces || namespaceArg
-          }, this.props, {
+          }, this.props), {}, {
             i18nOptions: Object.keys(mergedI18nOptions).length > 0 ? mergedI18nOptions : null
           }), (t, _ref) => {
-            let ready = _ref.ready,
+            var {
+              ready
+            } = _ref,
                 rest = _objectWithoutProperties(_ref, ["ready"]);
 
-            return React__default.createElement(WrappedComponent, _objectSpread({
+            return /*#__PURE__*/React__default.createElement(WrappedComponent, _objectSpread2(_objectSpread2(_objectSpread2({
               tReady: ready
-            }, this.props, extraProps, rest));
+            }, this.props), extraProps), rest));
           });
         }
 
       }
 
-      const LoadNamespaceWithContext = withI18n()(LoadNamespace);
+      var LoadNamespaceWithContext = withI18n()(LoadNamespace);
       LoadNamespaceWithContext.WrappedComponent = WrappedComponent;
-      LoadNamespaceWithContext.displayName = `LoadNamespace(${getDisplayName$1(WrappedComponent)})`;
+      LoadNamespaceWithContext.displayName = "LoadNamespace(".concat(getDisplayName$1(WrappedComponent), ")");
       LoadNamespaceWithContext.namespaces = namespaceArg;
       return hoistNonReactStatics_cjs(LoadNamespaceWithContext, WrappedComponent);
     };
   }
   withNamespaces.setDefaults = setDefaults;
   withNamespaces.setI18n = setI18n;
-  const translate = withNamespaces;
+  var translate = withNamespaces;
 
   /**
    * This file automatically generated from `pre-publish.js`.
@@ -1225,31 +1167,31 @@
     children.forEach((child, i) => {
       // const isElement = React.isValidElement(child);
       // const elementKey = `${index !== 0 ? index + '-' : ''}${i}:${typeof child.type === 'function' ? child.type.name : child.type || 'var'}`;
-      const elementKey = `${i}`;
+      var elementKey = "".concat(i);
 
       if (typeof child === 'string') {
-        mem = `${mem}${child}`;
+        mem = "".concat(mem).concat(child);
       } else if (hasChildren(child)) {
-        mem = `${mem}<${elementKey}>${nodesToString('', getChildren(child), i + 1)}</${elementKey}>`;
-      } else if (React__default.isValidElement(child)) {
-        mem = `${mem}<${elementKey}></${elementKey}>`;
+        mem = "".concat(mem, "<").concat(elementKey, ">").concat(nodesToString('', getChildren(child), i + 1), "</").concat(elementKey, ">");
+      } else if ( /*#__PURE__*/React__default.isValidElement(child)) {
+        mem = "".concat(mem, "<").concat(elementKey, "></").concat(elementKey, ">");
       } else if (typeof child === 'object') {
-        const clone = _objectSpread({}, child);
+        var clone = _objectSpread2({}, child);
 
-        const format = clone.format;
+        var format = clone.format;
         delete clone.format;
-        const keys = Object.keys(clone);
+        var keys = Object.keys(clone);
 
         if (format && keys.length === 1) {
-          mem = `${mem}{{${keys[0]}, ${format}}}`;
+          mem = "".concat(mem, "{{").concat(keys[0], ", ").concat(format, "}}");
         } else if (keys.length === 1) {
-          mem = `${mem}{{${keys[0]}}}`;
+          mem = "".concat(mem, "{{").concat(keys[0], "}}");
         } else {
           // not a valid interpolation object (can only contain one value plus format)
-          warn(`react-i18next: the passed in object contained more than one variable - the object should look like {{ value, format }} where format is optional.`, child);
+          warn("react-i18next: the passed in object contained more than one variable - the object should look like {{ value, format }} where format is optional.", child);
         }
       } else {
-        warn(`Trans: the passed in value is invalid - seems you passed in a variable like {number} - please pass in variables for interpolation as full objects like {{number}}.`, child);
+        warn("Trans: the passed in value is invalid - seems you passed in a variable like {number} - please pass in variables for interpolation as full objects like {{number}}.", child);
       }
     });
     return mem;
@@ -1259,13 +1201,13 @@
     if (targetString === '') return [];
     if (!children) return [targetString]; // v2 -> interpolates upfront no need for "some <0>{{var}}</0>"" -> will be just "some {{var}}" in translation file
 
-    const data = {};
+    var data = {};
 
     function getData(childs) {
       if (Object.prototype.toString.call(childs) !== '[object Array]') childs = [childs];
       childs.forEach(child => {
         if (typeof child === 'string') return;
-        if (hasChildren(child)) getData(getChildren(child));else if (typeof child === 'object' && !React__default.isValidElement(child)) Object.assign(data, child);
+        if (hasChildren(child)) getData(getChildren(child));else if (typeof child === 'object' && ! /*#__PURE__*/React__default.isValidElement(child)) Object.assign(data, child);
       });
     }
 
@@ -1273,27 +1215,27 @@
     targetString = i18n.services.interpolator.interpolate(targetString, data, i18n.language); // parse ast from string with additional wrapper tag
     // -> avoids issues in parser removing prepending text nodes
 
-    const ast = htmlParseStringify2.parse(`<0>${targetString}</0>`);
+    var ast = htmlParseStringify2.parse("<0>".concat(targetString, "</0>"));
 
     function mapAST(reactNodes, astNodes) {
       if (Object.prototype.toString.call(reactNodes) !== '[object Array]') reactNodes = [reactNodes];
       if (Object.prototype.toString.call(astNodes) !== '[object Array]') astNodes = [astNodes];
       return astNodes.reduce((mem, node, i) => {
         if (node.type === 'tag') {
-          const child = reactNodes[parseInt(node.name, 10)] || {};
-          const isElement = React__default.isValidElement(child);
+          var child = reactNodes[parseInt(node.name, 10)] || {};
+          var isElement = /*#__PURE__*/React__default.isValidElement(child);
 
           if (typeof child === 'string') {
             mem.push(child);
           } else if (hasChildren(child)) {
-            const inner = mapAST(getChildren(child), node.children);
+            var inner = mapAST(getChildren(child), node.children);
             if (child.dummy) child.children = inner; // needed on preact!
 
-            mem.push(React__default.cloneElement(child, _objectSpread({}, child.props, {
+            mem.push( /*#__PURE__*/React__default.cloneElement(child, _objectSpread2(_objectSpread2({}, child.props), {}, {
               key: i
             }), inner));
           } else if (typeof child === 'object' && !isElement) {
-            const content = node.children[0] ? node.children[0].content : null; // v1
+            var content = node.children[0] ? node.children[0].content : null; // v1
             // as interpolation was done already we just have a regular content node
             // in the translation AST while having an object in reactNodes
             // -> push the content no need to interpolate again
@@ -1313,7 +1255,7 @@
     // return the children of that extra node to get expected result
 
 
-    const result = mapAST([{
+    var result = mapAST([{
       dummy: true,
       children
     }], ast);
@@ -1322,47 +1264,49 @@
 
   class TransComponent extends React__default.Component {
     render() {
-      const _this$props = this.props,
-            children = _this$props.children,
-            count = _this$props.count,
-            parent = _this$props.parent,
-            i18nKey = _this$props.i18nKey,
-            tOptions = _this$props.tOptions,
-            values = _this$props.values,
-            defaults = _this$props.defaults,
-            components = _this$props.components,
-            namespace = _this$props.ns,
-            i18n = _this$props.i18n,
-            tFromContextAndProps = _this$props.t,
-            defaultNS = _this$props.defaultNS,
-            reportNS = _this$props.reportNS,
-            lng = _this$props.lng,
-            i18nOptions = _this$props.i18nOptions,
-            additionalProps = _objectWithoutProperties(_this$props, ["children", "count", "parent", "i18nKey", "tOptions", "values", "defaults", "components", "ns", "i18n", "t", "defaultNS", "reportNS", "lng", "i18nOptions"]);
+      var _this$props = this.props,
+          {
+        children,
+        count,
+        parent,
+        i18nKey,
+        tOptions,
+        values,
+        defaults,
+        components,
+        ns: namespace,
+        i18n,
+        t: tFromContextAndProps,
+        defaultNS,
+        reportNS,
+        lng,
+        i18nOptions
+      } = _this$props,
+          additionalProps = _objectWithoutProperties(_this$props, ["children", "count", "parent", "i18nKey", "tOptions", "values", "defaults", "components", "ns", "i18n", "t", "defaultNS", "reportNS", "lng", "i18nOptions"]);
 
-      const t = tFromContextAndProps || i18n.t.bind(i18n);
-      const reactI18nextOptions = i18n.options && i18n.options.react || {};
-      const useAsParent = parent !== undefined ? parent : reactI18nextOptions.defaultTransParent;
-      const defaultValue = defaults || nodesToString('', children, 0) || reactI18nextOptions.transEmptyNodeValue;
-      const hashTransKey = reactI18nextOptions.hashTransKey;
-      const key = i18nKey || (hashTransKey ? hashTransKey(defaultValue) : defaultValue);
-      const interpolationOverride = values ? {} : {
+      var t = tFromContextAndProps || i18n.t.bind(i18n);
+      var reactI18nextOptions = i18n.options && i18n.options.react || {};
+      var useAsParent = parent !== undefined ? parent : reactI18nextOptions.defaultTransParent;
+      var defaultValue = defaults || nodesToString('', children, 0) || reactI18nextOptions.transEmptyNodeValue;
+      var hashTransKey = reactI18nextOptions.hashTransKey;
+      var key = i18nKey || (hashTransKey ? hashTransKey(defaultValue) : defaultValue);
+      var interpolationOverride = values ? {} : {
         interpolation: {
           prefix: '#$?',
           suffix: '?$#'
         }
       };
-      const translation = key ? t(key, _objectSpread({}, tOptions, values, interpolationOverride, {
+      var translation = key ? t(key, _objectSpread2(_objectSpread2(_objectSpread2(_objectSpread2({}, tOptions), values), interpolationOverride), {}, {
         defaultValue,
         count,
         ns: namespace
       })) : defaultValue;
 
       if (reactI18nextOptions.exposeNamespace) {
-        let ns = typeof t.ns === 'string' ? t.ns : t.ns[0];
+        var ns = typeof t.ns === 'string' ? t.ns : t.ns[0];
 
         if (i18nKey && i18n.options && i18n.options.nsSeparator && i18nKey.indexOf(i18n.options.nsSeparator) > -1) {
-          const parts = i18nKey.split(i18n.options.nsSeparator);
+          var parts = i18nKey.split(i18n.options.nsSeparator);
           ns = parts[0];
         }
 
@@ -1372,11 +1316,11 @@
       }
 
       if (!useAsParent) return renderNodes(components || children, translation, i18n);
-      return React__default.createElement(useAsParent, additionalProps, renderNodes(components || children, translation, i18n));
+      return /*#__PURE__*/React__default.createElement(useAsParent, additionalProps, renderNodes(components || children, translation, i18n));
     }
 
   }
-  const Trans = withI18n()(TransComponent);
+  var Trans = withI18n()(TransComponent);
 
   class I18nextProvider extends React.Component {
     constructor(props) {
@@ -1386,12 +1330,13 @@
     }
 
     render() {
-      const _this$props = this.props,
-            children = _this$props.children,
-            i18n = _this$props.i18n,
-            defaultNS = _this$props.defaultNS,
-            reportNS = _this$props.reportNS;
-      return React__default.createElement(I18nContext.Provider, {
+      var {
+        children,
+        i18n,
+        defaultNS,
+        reportNS
+      } = this.props;
+      return /*#__PURE__*/React__default.createElement(I18nContext.Provider, {
         value: {
           i18n,
           defaultNS,
@@ -1411,52 +1356,53 @@
     }
 
     render() {
-      const _this$props = this.props,
-            i18n = _this$props.i18n,
-            t = _this$props.t,
-            i18nKey = _this$props.i18nKey,
-            options = _this$props.options,
-            className = _this$props.className,
-            style = _this$props.style;
-      const parent = this.props.parent || 'span';
-      const REGEXP = this.props.regexp || i18n.services.interpolator.regexp; // Set to true if you want to use raw HTML in translation values
+      var {
+        i18n,
+        t,
+        i18nKey,
+        options,
+        className,
+        style
+      } = this.props;
+      var parent = this.props.parent || 'span';
+      var REGEXP = this.props.regexp || i18n.services.interpolator.regexp; // Set to true if you want to use raw HTML in translation values
       // See https://github.com/i18next/react-i18next/issues/189
 
-      const useDangerouslySetInnerHTML = this.props.useDangerouslySetInnerHTML || false;
-      const dangerouslySetInnerHTMLPartElement = this.props.dangerouslySetInnerHTMLPartElement || 'span';
+      var useDangerouslySetInnerHTML = this.props.useDangerouslySetInnerHTML || false;
+      var dangerouslySetInnerHTMLPartElement = this.props.dangerouslySetInnerHTMLPartElement || 'span';
 
-      const tOpts = _objectSpread({}, {}, options, {
+      var tOpts = _objectSpread2(_objectSpread2(_objectSpread2({}, {}), options), {
         interpolation: {
           prefix: '#$?',
           suffix: '?$#'
         }
       });
 
-      const format = t(i18nKey, tOpts);
-      if (!format || typeof format !== 'string') return React__default.createElement('noscript', null);
-      const children = [];
+      var format = t(i18nKey, tOpts);
+      if (!format || typeof format !== 'string') return /*#__PURE__*/React__default.createElement('noscript', null);
+      var children = [];
 
-      const handleFormat = (key, props) => {
+      var handleFormat = (key, props) => {
         if (key.indexOf(i18n.options.interpolation.formatSeparator) < 0) {
-          if (props[key] === undefined) i18n.services.logger.warn(`interpolator: missed to pass in variable ${key} for interpolating ${format}`);
+          if (props[key] === undefined) i18n.services.logger.warn("interpolator: missed to pass in variable ".concat(key, " for interpolating ").concat(format));
           return props[key];
         }
 
-        const p = key.split(i18n.options.interpolation.formatSeparator);
-        const k = p.shift().trim();
-        const f = p.join(i18n.options.interpolation.formatSeparator).trim();
-        if (props[k] === undefined) i18n.services.logger.warn(`interpolator: missed to pass in variable ${k} for interpolating ${format}`);
+        var p = key.split(i18n.options.interpolation.formatSeparator);
+        var k = p.shift().trim();
+        var f = p.join(i18n.options.interpolation.formatSeparator).trim();
+        if (props[k] === undefined) i18n.services.logger.warn("interpolator: missed to pass in variable ".concat(k, " for interpolating ").concat(format));
         return i18n.options.interpolation.format(props[k], f, i18n.language);
       };
 
       format.split(REGEXP).reduce((memo, match, index) => {
-        let child;
+        var child;
 
         if (index % 2 === 0) {
           if (match.length === 0) return memo;
 
           if (useDangerouslySetInnerHTML) {
-            child = React__default.createElement(dangerouslySetInnerHTMLPartElement, {
+            child = /*#__PURE__*/React__default.createElement(dangerouslySetInnerHTMLPartElement, {
               dangerouslySetInnerHTML: {
                 __html: match
               }
@@ -1471,13 +1417,13 @@
         memo.push(child);
         return memo;
       }, children);
-      const additionalProps = {};
+      var additionalProps = {};
 
       if (i18n.options.react && i18n.options.react.exposeNamespace) {
-        let ns = typeof t.ns === 'string' ? t.ns : t.ns[0];
+        var ns = typeof t.ns === 'string' ? t.ns : t.ns[0];
 
         if (i18nKey && i18n.options.nsSeparator && i18nKey.indexOf(i18n.options.nsSeparator) > -1) {
-          const parts = i18nKey.split(i18n.options.nsSeparator);
+          var parts = i18nKey.split(i18n.options.nsSeparator);
           ns = parts[0];
         }
 
@@ -1492,7 +1438,7 @@
     }
 
   }
-  const Interpolate = withI18n()(InterpolateComponent);
+  var Interpolate = withI18n()(InterpolateComponent);
 
   exports.loadNamespaces = loadNamespaces;
   exports.withNamespaces = withNamespaces;
